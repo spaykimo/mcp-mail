@@ -1117,20 +1117,93 @@ export class MailService {
   }
 
   /**
+   * 创建邮件文件夹
+   * @param folderName 文件夹名称（支持嵌套，如 "Work/Project A"）
+   * @returns 是否成功创建
+   */
+  async createFolder(folderName: string): Promise<boolean> {
+    await this.connectImap();
+
+    return new Promise((resolve, reject) => {
+      this.imapClient.addBox(folderName, (err: Error | null) => {
+        if (err) {
+          console.error(`创建文件夹 ${folderName} 失败:`, err);
+          reject(err);
+          return;
+        }
+        console.log(`成功创建文件夹：${folderName}`);
+        resolve(true);
+      });
+    });
+  }
+
+  /**
+   * 删除邮件文件夹（仅能删除空文件夹）
+   * @param folderName 要删除的文件夹名称
+   * @returns 是否成功删除
+   */
+  async deleteFolder(folderName: string): Promise<boolean> {
+    await this.connectImap();
+
+    return new Promise((resolve, reject) => {
+      // IMAP DELETE 命令只能删除空文件夹
+      this.imapClient.delBox(folderName, (err: Error | null) => {
+        if (err) {
+          console.error(`删除文件夹 ${folderName} 失败:`, err);
+          // 检查是否是 "mailbox does not exist" 或 "cannot delete non-empty mailbox"
+          const errorMessage = String(err);
+          if (errorMessage.includes('does not exist')) {
+            resolve(false); // 文件夹不存在
+          } else if (errorMessage.includes('non-empty')) {
+            reject(new Error(`无法删除非空文件夹 ${folderName}，请先移走或删除其中的邮件`));
+          } else {
+            reject(err);
+          }
+          return;
+        }
+        console.log(`成功删除文件夹：${folderName}`);
+        resolve(true);
+      });
+    });
+  }
+
+  /**
+   * 重命名邮件文件夹
+   * @param oldName 原文件夹名称
+   * @param newName 新文件夹名称
+   * @returns 是否成功重命名
+   */
+  async renameFolder(oldName: string, newName: string): Promise<boolean> {
+    await this.connectImap();
+
+    return new Promise((resolve, reject) => {
+      this.imapClient.renameBox(oldName, newName, (err) => {
+        if (err) {
+          console.error(`重命名文件夹 ${oldName} -> ${newName} 失败:`, err);
+          reject(err);
+          return;
+        }
+        console.log(`成功重命名文件夹：${oldName} -> ${newName}`);
+        resolve(true);
+      });
+    });
+  }
+
+  /**
    * 等待新邮件回复
    * 此方法使用轮询方式检测新邮件的到达。主要用于需要等待用户邮件回复的场景。
-   * 
+   *
    * 工作原理：
-   * 1. 首先检查是否有5分钟内的未读邮件，如果有，返回特殊状态提示需要先处理这些邮件
+   * 1. 首先检查是否有 5 分钟内的未读邮件，如果有，返回特殊状态提示需要先处理这些邮件
    * 2. 如果没有最近的未读邮件，则：
-   *    - 连接到IMAP服务器并获取当前邮件数量
-   *    - 每5秒检查一次邮件数量
+   *    - 连接到 IMAP 服务器并获取当前邮件数量
+   *    - 每 5 秒检查一次邮件数量
    *    - 如果发现新邮件，获取最新的邮件内容
-   *    - 如果超过指定时间仍未收到新邮件，则返回null
-   * 
+   *    - 如果超过指定时间仍未收到新邮件，则返回 null
+   *
    * @param folder 要监听的文件夹，默认为'INBOX'（收件箱）
-   * @param timeout 超时时间（毫秒），默认为3小时。超时后返回null
-   * @returns 如果在超时前收到新邮件，返回邮件详情；如果超时，返回null；如果有最近未读邮件，返回带有特殊标记的邮件列表
+   * @param timeout 超时时间（毫秒），默认为 3 小时。超时后返回 null
+   * @returns 如果在超时前收到新邮件，返回邮件详情；如果超时，返回 null；如果有最近未读邮件，返回带有特殊标记的邮件列表
    */
   async waitForNewReply(folder: string = 'INBOX', timeout: number = 3 * 60 * 60 * 1000): Promise<MailItem | null | { type: 'unread_warning'; mails: MailItem[] }> {
     await this.connectImap();

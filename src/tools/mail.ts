@@ -1046,7 +1046,118 @@ DEFAULT_FROM_EMAIL=your.email@domain.com
         } catch (error) {
           return {
             content: [
-              { type: "text", text: `获取邮件文件夹列表时发生错误: ${error instanceof Error ? error.message : String(error)}` }
+              { type: "text", text: `获取邮件文件夹列表时发生错误：${error instanceof Error ? error.message : String(error)}` }
+            ]
+          };
+        }
+      }
+    );
+
+    // 创建新邮件文件夹
+    this.server.tool(
+      "createFolder",
+      {
+        folderName: z.string().min(1, "文件夹名称不能为空")
+      },
+      async ({ folderName }) => {
+        try {
+          const success = await this.mailService.createFolder(folderName);
+          
+          if (success) {
+            return {
+              content: [
+                { type: "text", text: `✅ 成功创建邮件文件夹："${folderName}"` }
+              ]
+            };
+          } else {
+            return {
+              content: [
+                { type: "text", text: `❌ 创建文件夹失败` }
+              ]
+            };
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          // 处理特定错误（如文件夹已存在）
+          if (errorMsg.includes('already exists')) {
+            return {
+              content: [
+                { type: "text", text: `❌ 创建文件夹失败：文件夹"${folderName}"已经存在` }
+              ]
+            };
+          }
+          return {
+            content: [
+              { type: "text", text: `❌ 创建文件夹时发生错误：${errorMsg}` }
+            ]
+          };
+        }
+      }
+    );
+
+    // 删除邮件文件夹
+    this.server.tool(
+      "deleteFolder",
+      {
+        folderName: z.string().min(1, "文件夹名称不能为空")
+      },
+      async ({ folderName }) => {
+        try {
+          const success = await this.mailService.deleteFolder(folderName);
+          
+          if (success) {
+            return {
+              content: [
+                { type: "text", text: `✅ 成功删除邮件文件夹："${folderName}"` }
+              ]
+            };
+          } else {
+            return {
+              content: [
+                { type: "text", text: `❌ 删除文件夹失败：文件夹"${folderName}"不存在` }
+              ]
+            };
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              { type: "text", text: `❌ 删除文件夹时发生错误：${errorMsg}` }
+            ]
+          };
+        }
+      }
+    );
+
+    // 重命名邮件文件夹
+    this.server.tool(
+      "renameFolder",
+      {
+        oldName: z.string().min(1, "原文件夹名称不能为空"),
+        newName: z.string().min(1, "新文件夹名称不能为空")
+      },
+      async ({ oldName, newName }) => {
+        try {
+          const success = await this.mailService.renameFolder(oldName, newName);
+          
+          if (success) {
+            return {
+              content: [
+                { type: "text", text: `✅ 成功重命名文件夹："${oldName}" -> "${newName}"` }
+              ]
+            };
+          } else {
+            return {
+              content: [
+                { type: "text", text: `❌ 重命名文件夹失败` }
+              ]
+            };
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              { type: "text", text: `❌ 重命名文件夹时发生错误：${errorMsg}` }
             ]
           };
         }
